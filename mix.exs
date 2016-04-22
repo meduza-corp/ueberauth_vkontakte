@@ -1,7 +1,7 @@
 defmodule UeberauthVkontakte.Mixfile do
   use Mix.Project
 
-  @version "0.3.2"
+  @version "0.1"
   @url "https://github.com/meduza/ueberauth_vkontakte"
 
   def project do
