@@ -1,4 +1,5 @@
 defmodule Ueberauth.Strategy.Vkontakte do
+  require Logger
   @moduledoc """
   Vkontakte Strategy for Überauth.
   """
@@ -9,7 +10,6 @@ defmodule Ueberauth.Strategy.Vkontakte do
                           allowed_request_params: [
                             :auth_type,
                             :scope,
-                            :locale
                           ]
 
 
@@ -40,7 +40,11 @@ defmodule Ueberauth.Strategy.Vkontakte do
   Handles the callback from Vkontakte.
   """
   def handle_callback!(%Plug.Conn{params: %{"code" => code}} = conn) do
-    opts = [redirect_uri: callback_url(conn)]
+    opts = [
+      redirect_uri: callback_url(conn),
+      client_id: Ueberauth.Strategy.Vkontakte.OAuth.client.client_id,
+      client_secret: Ueberauth.Strategy.Vkontakte.OAuth.client.client_secret,
+    ]
     token = Ueberauth.Strategy.Vkontakte.OAuth.get_token!([code: code], opts)
 
     if token.access_token == nil do
@@ -103,7 +107,7 @@ defmodule Ueberauth.Strategy.Vkontakte do
       description: user["bio"],
       email: user["email"],
       first_name: user["first_name"],
-      image: fetch_image(user["id"]),
+      image: user["avatar"],
       last_name: user["last_name"],
       name: user["name"],
       urls: %{
@@ -126,41 +130,47 @@ defmodule Ueberauth.Strategy.Vkontakte do
     }
   end
 
-  defp fetch_image(uid) do
-    "http://graph.vkontakte.com/#{uid}/picture?type=square"
-  end
-
   defp fetch_user(conn, token) do
     conn = put_private(conn, :vkontakte_token, token)
-    query = user_query(conn)
-    path = "/me?#{query}"
-    case OAuth2.AccessToken.get(token, path) do
+    %{
+      other_params: %{
+        "user_id" => user_id,
+        "email" => email
+      }
+    } = conn.private.vkontakte_token
+    url = "https://api.vk.com/method/users.get?user_id=#{user_id}&fields=photo_50&v=5.50"
+
+    case OAuth2.AccessToken.get(token, url) do
       {:ok, %OAuth2.Response{status_code: 401, body: _body}} ->
         set_errors!(conn, [error("token", "unauthorized")])
-      {:ok, %OAuth2.Response{status_code: status_code, body: user}}
+      {:ok, %OAuth2.Response{status_code: status_code, body: body}}
         when status_code in 200..399 ->
+        %{"response" => [user] } = body
+        user = Map.merge(user, %{"id" => "#{user_id}", "email" => email, "avatar" => user["photo_50"]})
         put_private(conn, :vkontakte_user, user)
       {:error, %OAuth2.Error{reason: reason}} ->
         set_errors!(conn, [error("OAuth2", reason)])
     end
   end
 
-  defp user_query(conn) do
-    conn
-    |> query_params(:locale)
-    |> Map.merge(query_params(conn, :profile))
-    |> URI.encode_query
-  end
 
-  defp query_params(conn, :profile) do
-    %{"fields" => option(conn, :profile_fields)}
-  end
-  defp query_params(conn, :locale) do
-    case option(conn, :locale) do
-      nil -> %{}
-      locale -> %{"locale" => locale}
-    end
-  end
+  # This is left from ueberauth_facebook
+  # vk has a different strategy to get user data
+  # defp user_query(conn) do
+  #   conn
+  #   |> Map.merge(query_params(conn, :profile))
+  #   |> URI.encode_query
+  # end
+
+  # defp query_params(conn, :profile) do
+  #   %{"fields" => option(conn, :profile_fields)}
+  # end
+  # defp query_params(conn, :locale) do
+  #   case option(conn, :locale) do
+  #     nil -> %{}
+  #     locale -> %{"locale" => locale}
+  #   end
+  # end
 
   defp option(conn, key) do
     default = Dict.get(default_options, key)
