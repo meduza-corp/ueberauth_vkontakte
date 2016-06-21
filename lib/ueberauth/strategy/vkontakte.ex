@@ -132,12 +132,22 @@ defmodule Ueberauth.Strategy.Vkontakte do
 
   defp fetch_user(conn, token) do
     conn = put_private(conn, :vkontakte_token, token)
+
     %{
       other_params: %{
-        "user_id" => user_id,
-        "email" => email
+        "user_id" => user_id
       }
     } = conn.private.vkontakte_token
+
+    email = case conn.private.vkontakte_token do
+      %{
+        other_params: %{
+          "email" => email
+        }
+      } -> email
+      _ -> nil
+    end
+
     url = "https://api.vk.com/method/users.get?user_id=#{user_id}&fields=photo_50&v=5.50"
 
     case OAuth2.AccessToken.get(token, url) do
