@@ -1,3 +1,5 @@
+# This is not being actively supported, consider using https://github.com/sobolevn/ueberauth_vk instead.
+
 # Überauth vkontakte
 
 [license]: http://opensource.org/licenses/MIT
