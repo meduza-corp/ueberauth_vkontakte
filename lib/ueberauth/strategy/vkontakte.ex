@@ -148,7 +148,7 @@ defmodule Ueberauth.Strategy.Vkontakte do
       _ -> nil
     end
 
-    url = "https://api.vk.com/method/users.get?user_id=#{user_id}&fields=photo_50&v=5.50"
+    url = "https://api.vk.com/method/users.get?user_id=#{user_id}&fields=photo_50&v=5.50&access_token=#{token}"
 
     case OAuth2.AccessToken.get(token, url) do
       {:ok, %OAuth2.Response{status_code: 401, body: _body}} ->
